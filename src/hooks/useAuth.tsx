@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('vms_employee');
     setToken(null);
     setEmployee(null);
-    window.location.href = '/login';
+    window.location.href = '/';
   }, []);
 
   return (
