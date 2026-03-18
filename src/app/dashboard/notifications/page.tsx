@@ -31,19 +31,14 @@ function ApproveModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    // Outer wrapper: on mobile align to bottom but with bottom padding = nav height (64px)
+    // On sm+ center it
+    <div className="fixed inset-0 z-50 flex justify-center items-end sm:items-center"
+      style={{ paddingBottom: '64px' }}>
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
-
-      {/*
-        Mobile:  bottom sheet, max-h avoids bottom nav (80px = ~5rem),
-                 flex-col so header/footer are sticky and only middle scrolls
-        Desktop: centred modal, max-h 90vh
-      */}
       <div
         className="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col"
-        style={{
-          maxHeight: 'calc(100dvh - 5rem)',   /* mobile: stay above bottom nav */
-        }}
+        style={{ maxHeight: 'calc(100dvh - 130px)' }}
       >
         {/* ── Sticky header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
