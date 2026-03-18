@@ -33,10 +33,20 @@ function ApproveModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
-      {/* Bottom sheet on mobile, centred modal on desktop */}
-      <div className="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
 
-        <div className="flex items-center justify-between px-5 lg:px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+      {/*
+        Mobile:  bottom sheet, max-h avoids bottom nav (80px = ~5rem),
+                 flex-col so header/footer are sticky and only middle scrolls
+        Desktop: centred modal, max-h 90vh
+      */}
+      <div
+        className="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col"
+        style={{
+          maxHeight: 'calc(100dvh - 5rem)',   /* mobile: stay above bottom nav */
+        }}
+      >
+        {/* ── Sticky header ── */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-bold text-gray-900 lg:text-lg flex items-center gap-2">
             <Check className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-600" /> Approve Visit
           </h2>
@@ -45,7 +55,9 @@ function ApproveModal({
           </button>
         </div>
 
-        <div className="p-5 lg:p-6 flex flex-col gap-4 lg:gap-5 overflow-y-auto">
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 lg:p-6 flex flex-col gap-4 lg:gap-5">
+
           {/* Visitor summary */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
             {visit.visitor_thumbnail ? (
@@ -120,21 +132,22 @@ function ApproveModal({
               <p>{requireOtp ? '🔐 A 6-digit OTP' : '✅ No OTP required'}</p>
             </div>
           )}
+        </div>
 
-          <div className="flex gap-2 lg:gap-3">
-            <button onClick={onClose}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold text-sm">
-              Cancel
-            </button>
-            <button onClick={handleSubmit} disabled={submitting || !locationId}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
-              style={{ background: '#059669' }}>
-              {submitting
-                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                : <Check className="w-4 h-4" />}
-              {submitting ? 'Approving…' : 'Approve & Notify'}
-            </button>
-          </div>
+        {/* ── Sticky footer buttons — always visible ── */}
+        <div className="flex gap-2 lg:gap-3 px-5 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+          <button onClick={onClose}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold text-sm active:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={submitting || !locationId}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50"
+            style={{ background: '#059669' }}>
+            {submitting
+              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Check className="w-4 h-4" />}
+            {submitting ? 'Approving…' : 'Approve & Notify'}
+          </button>
         </div>
       </div>
     </div>
