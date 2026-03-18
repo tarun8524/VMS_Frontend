@@ -380,6 +380,10 @@ export default function HomePage() {
               </div>
 
               {card === 'signin' ? <SignInForm /> : <SignUpForm onDone={() => setCard('signin')} />}
+
+              <div className="flex items-center justify-center mt-6 pt-2">
+                <img src="/facegenie_logo.png" alt="Logo" style={{ height: '60px', width: '220px' }} />
+              </div>
             </div>
             
 
