@@ -7,12 +7,10 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
   }
-
   body {
     @apply bg-gray-50 text-gray-900;
     font-family: system-ui, -apple-system, sans-serif;
   }
-
   h1, h2, h3, h4, h5, h6 {
     font-family: system-ui, -apple-system, sans-serif;
     font-weight: 700;
@@ -21,7 +19,7 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+    @apply inline-flex items-center gap-2 px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg
            bg-crimson-700 hover:bg-crimson-800 active:bg-crimson-900
            text-white font-semibold text-sm
            shadow-red transition-all duration-150
@@ -29,7 +27,7 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg
+    @apply inline-flex items-center gap-2 px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg
            border border-gray-200 bg-white hover:bg-gray-50 hover:border-crimson-300
            text-gray-700 font-semibold text-sm
            transition-all duration-150
@@ -43,19 +41,19 @@
   }
 
   .input {
-    @apply w-full px-3 py-2 rounded-lg border border-gray-200
+    @apply w-full px-3 lg:px-4 py-2 lg:py-2.5 rounded-lg border border-gray-200
            bg-white text-gray-900 text-sm placeholder-gray-400
            focus:outline-none focus:ring-2 focus:ring-crimson-300 focus:border-crimson-400
            transition-all duration-150;
   }
 
+  /* Mobile compact, desktop spacious */
   .card {
-    @apply bg-white rounded-xl shadow-card border border-gray-100 p-4;
+    @apply bg-white rounded-xl lg:rounded-2xl shadow-card border border-gray-100 p-3 lg:p-6;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-           text-xs font-semibold;
+    @apply inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold;
   }
 
   .badge-pending     { @apply badge bg-amber-50 text-amber-700 border border-amber-200; }
@@ -64,12 +62,9 @@
   .badge-checked_in  { @apply badge bg-blue-50 text-blue-700 border border-blue-200; }
   .badge-checked_out { @apply badge bg-gray-100 text-gray-600 border border-gray-200; }
 
-  .stat-card {
-    @apply card flex flex-col gap-1.5;
-  }
+  .stat-card { @apply card flex flex-col gap-1.5 lg:gap-2; }
 }
 
-/* Thin scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { @apply bg-gray-200 rounded-full; }
