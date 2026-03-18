@@ -26,13 +26,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <AuthProvider>
       <Guard>
-        <div className="flex bg-[#f5f5f5] min-h-screen">
+        {/*
+          KEY FIX: h-screen + overflow-hidden on the flex wrapper pins the
+          total height to the viewport. The sidebar is self-contained and never
+          overflows. Only <main> scrolls — sidebar stays visually fixed.
+        */}
+        <div className="flex h-screen overflow-hidden bg-[#f5f5f5]">
           <Sidebar />
           {/*
-            Mobile:  pt-16 (top bar) + pb-20 (bottom nav) + px-3
-            Desktop: p-6 as before
+            overflow-y-auto  → only this column scrolls, sidebar never moves.
+            Mobile:  pt-16 (top bar height) + pb-20 (bottom nav) + px-3
+            Desktop: p-6
           */}
-          <main className="flex-1 min-w-0 overflow-auto
+          <main className="flex-1 min-w-0 overflow-y-auto
                            pt-16 pb-20 px-3
                            lg:pt-6 lg:pb-6 lg:px-6">
             {children}
