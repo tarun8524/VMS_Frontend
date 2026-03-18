@@ -59,6 +59,16 @@ export const visitApi = {
   stats:        ()                 => api.get('/visits/my/stats'),
   pendingCount: ()                 => api.get('/visits/my/pending-count'),
   search:       (q: string)        => api.get('/visits/my/search', { params: { q } }),
-  updateStatus: (visitId: string, status: string) =>
-    api.patch(`/visits/${visitId}/status`, { status }),
+  updateStatus: (
+    visitId: string,
+    status: string,
+    location_id?: string,
+    require_otp?: boolean,
+  ) =>
+    api.patch(`/visits/${visitId}/status`, { status, location_id, require_otp }),
+};
+
+// ── Locations ─────────────────────────────────────────────────────────────────
+export const locationApi = {
+  list: () => api.get('/locations/'),
 };

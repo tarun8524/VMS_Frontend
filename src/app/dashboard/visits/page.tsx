@@ -7,11 +7,11 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import toast from 'react-hot-toast';
 
 const TABS: { label: string; value: string }[] = [
-  { label: 'All',         value: ''            },
-  { label: 'Pending',     value: 'pending'     },
-  { label: 'Approved',    value: 'approved'    },
-  { label: 'Rejected',    value: 'rejected'    },
-  { label: 'Checked In',  value: 'checked_in'  },
+  { label: 'All',        value: ''           },
+  { label: 'Pending',    value: 'pending'    },
+  { label: 'Approved',   value: 'approved'   },
+  { label: 'Rejected',   value: 'rejected'   },
+  { label: 'Checked In', value: 'checked_in' },
 ];
 
 export default function VisitsPage() {
@@ -35,23 +35,23 @@ export default function VisitsPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="font-display text-3xl font-bold text-gray-900">Visit Records</h1>
-          <p className="text-gray-500 mt-1">All visitor requests assigned to you</p>
+          <h1 className="text-2xl font-bold text-gray-900">Visit Records</h1>
+          <p className="text-sm text-gray-500 mt-0.5">All visitor requests assigned to you</p>
         </div>
         <button onClick={() => load(tab)} className="btn-secondary">
-          <RefreshCw className="w-4 h-4" /> Refresh
+          <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-6">
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl w-fit mb-4 flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.value}
             onClick={() => setTab(t.value)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               tab === t.value
                 ? 'bg-white text-crimson-700 shadow-sm font-semibold'
                 : 'text-gray-500 hover:text-gray-700'
@@ -62,19 +62,18 @@ export default function VisitsPage() {
         ))}
       </div>
 
-      {/* Table */}
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 animate-pulse" />
+            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />
           ))}
         </div>
       ) : visits.length === 0 ? (
-        <div className="card text-center py-16">
-          <Users className="w-12 h-12 mx-auto text-gray-200 mb-3" />
-          <p className="text-gray-500 font-medium">No visits found</p>
-          <p className="text-sm text-gray-400 mt-1">
-            {tab ? `No ${tab} visits to show` : 'Visitors will appear here once registered'}
+        <div className="card text-center py-12">
+          <Users className="w-10 h-10 mx-auto text-gray-200 mb-2" />
+          <p className="text-gray-500 font-medium text-sm">No visits found</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {tab ? `No ${tab} visits` : 'Visitors will appear here once registered'}
           </p>
         </div>
       ) : (
@@ -83,41 +82,48 @@ export default function VisitsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-6 py-4">Visitor</th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-4">Contact</th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-4">Purpose</th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-4">Status</th>
-                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-4">Date</th>
+                  {['Visitor', 'Contact', 'Purpose', 'Status', 'Date'].map((h) => (
+                    <th key={h} className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide px-4 py-3">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {visits.map((v, i) => (
-                  <tr key={v.visit_id} className="hover:bg-gray-50 transition-colors" style={{ animationDelay: `${i * 0.03}s` }}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+                {visits.map((v) => (
+                  <tr key={v.visit_id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
                         {v.visitor_thumbnail ? (
-                          <img src={`data:image/jpeg;base64,${v.visitor_thumbnail}`}
-                            className="w-9 h-9 rounded-full object-cover border border-gray-200" alt="" />
+                          <img
+                            src={`data:image/jpeg;base64,${v.visitor_thumbnail}`}
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0"
+                            alt=""
+                          />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-crimson-100 flex items-center justify-center text-crimson-600 text-sm font-bold">
+                          <div className="w-8 h-8 rounded-full bg-crimson-100 flex items-center justify-center text-crimson-600 text-xs font-bold flex-shrink-0">
                             {v.visitor_name.charAt(0)}
                           </div>
                         )}
-                        <span className="font-semibold text-gray-900 text-sm">{v.visitor_name}</span>
+                        <span className="font-semibold text-gray-900 text-sm truncate max-w-[100px]">
+                          {v.visitor_name}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-3">
                       <p className="text-sm text-gray-700">{v.visitor_phone}</p>
                       <p className="text-xs text-gray-400">{v.visitor_email}</p>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-600 max-w-[160px] truncate">
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[140px] truncate">
                       {v.purpose || <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-3">
                       <StatusBadge status={v.status} />
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-400">
-                      {new Date(v.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(v.created_at).toLocaleDateString('en-IN', {
+                        day: 'numeric', month: 'short', year: '2-digit',
+                      })}
                     </td>
                   </tr>
                 ))}

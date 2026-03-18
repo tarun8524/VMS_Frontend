@@ -32,6 +32,10 @@ export interface Visit {
   status: VisitStatus;
   created_at: string;
   updated_at?: string;
+  location_id?: string;
+  location_name?: string;
+  otp?: string;
+  require_otp?: boolean;
 }
 
 export interface DashboardStats {
@@ -39,4 +43,13 @@ export interface DashboardStats {
   pending: number;
   approved: number;
   today: number;
+}
+
+export interface Location {
+  location_id: string;
+  name: string;
+  address: string;
+  lat: string;
+  lng: string;
+  maps_url: string;
 }

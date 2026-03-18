@@ -19,7 +19,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['Georgia', 'Cambria', 'serif'],
+        display: ['system-ui', '-apple-system', 'sans-serif'],
         body:    ['system-ui', '-apple-system', 'sans-serif'],
         mono:    ['ui-monospace', 'SFMono-Regular', 'monospace'],
       },
@@ -29,13 +29,13 @@ module.exports = {
         'red':     '0 4px 20px rgba(192,40,60,0.25)',
       },
       animation: {
-        'fade-in': 'fadeIn 0.4s ease both',
-        'slide-up': 'slideUp 0.4s ease both',
+        'fade-in':   'fadeIn 0.3s ease both',
+        'slide-up':  'slideUp 0.3s ease both',
         'pulse-dot': 'pulseDot 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn:   { from: { opacity: 0 }, to: { opacity: 1 } },
-        slideUp:  { from: { opacity: 0, transform: 'translateY(16px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+        slideUp:  { from: { opacity: 0, transform: 'translateY(12px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
         pulseDot: { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.4 } },
       },
     },
