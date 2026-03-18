@@ -9,7 +9,7 @@ function Guard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !employee) router.replace('/login');
+    if (!loading && !employee) router.replace('/');
   }, [employee, loading, router]);
 
   if (loading || !employee) {
