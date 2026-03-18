@@ -1,10 +1,13 @@
 import axios from 'axios';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BASE = process.env.NEXT_PUBLIC_API_URL || 'https://9a22-2401-4900-88e0-4ef7-18b6-efc5-c3b3-b954.ngrok-free.app';
 
 export const api = axios.create({
   baseURL: `${BASE}/api/v1`,
   timeout: 60000,
+  headers: {
+    'ngrok-skip-browser-warning': 'true',
+  },
 });
 
 // Attach JWT from localStorage on every request
