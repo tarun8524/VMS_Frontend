@@ -1,16 +1,14 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Users, Clock, CheckCircle, Calendar, TrendingUp,
-  ArrowRight, BarChart3, Activity
+  ArrowRight, BarChart3, Activity, XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { visitApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { DashboardStats, Visit } from '@/types';
-
-type TimeRange = '24h' | '7d' | '30d' | '90d';
+import { DashboardStats, Visit, TimeRange } from '@/types';
 
 interface ChartPoint {
   label: string;
@@ -31,7 +29,6 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
-// 0->12am, 9->9am, 13->1pm, 0(end)->12am
 function fmtHour(h: number): string {
   const period = h < 12 ? 'am' : 'pm';
   const h12 = h % 12 === 0 ? 12 : h % 12;
@@ -47,17 +44,14 @@ function tally(bucket: ChartPoint, status: string) {
 
 function buildChartData(visits: Visit[], range: TimeRange): ChartPoint[] {
   const now = Date.now();
-  const MS = { '24h': 86400000, '7d': 604800000, '30d': 2592000000, '90d': 7776000000 };
-  const filtered = visits.filter(v => now - new Date(v.created_at).getTime() <= MS[range]);
   const buckets: ChartPoint[] = [];
 
   if (range === '24h') {
-    // 8 x 3-hour slots, labels like "9am", "12pm", "3pm"
     for (let i = 7; i >= 0; i--) {
       const slotStart = new Date(now - i * 3 * 3600000);
       buckets.push({ label: fmtHour(slotStart.getHours()), total: 0, pending: 0, approved: 0, rejected: 0 });
     }
-    filtered.forEach(v => {
+    visits.forEach(v => {
       const msAgo = now - new Date(v.created_at).getTime();
       if (msAgo < 86400000) {
         const slotIdx = 7 - Math.floor(msAgo / (3 * 3600000));
@@ -70,7 +64,7 @@ function buildChartData(visits: Visit[], range: TimeRange): ChartPoint[] {
       const d = new Date(now - i * 86400000);
       buckets.push({ label: days[d.getDay()], total: 0, pending: 0, approved: 0, rejected: 0 });
     }
-    filtered.forEach(v => {
+    visits.forEach(v => {
       const daysAgo = Math.floor((now - new Date(v.created_at).getTime()) / 86400000);
       if (daysAgo < 7) {
         const idx = 6 - daysAgo;
@@ -81,21 +75,22 @@ function buildChartData(visits: Visit[], range: TimeRange): ChartPoint[] {
     for (let w = 3; w >= 0; w--) {
       buckets.push({ label: w === 0 ? 'This wk' : `${w}w ago`, total: 0, pending: 0, approved: 0, rejected: 0 });
     }
-    filtered.forEach(v => {
+    visits.forEach(v => {
       const daysAgo = Math.floor((now - new Date(v.created_at).getTime()) / 86400000);
       const idx = 3 - Math.min(3, Math.floor(daysAgo / 7));
       if (buckets[idx]) tally(buckets[idx], v.status);
     });
   } else {
+    // 'all' — group by month, last 6 months
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    for (let m = 2; m >= 0; m--) {
+    for (let m = 5; m >= 0; m--) {
       const d = new Date(); d.setMonth(d.getMonth() - m);
       buckets.push({ label: months[d.getMonth()], total: 0, pending: 0, approved: 0, rejected: 0 });
     }
-    filtered.forEach(v => {
+    visits.forEach(v => {
       const vd = new Date(v.created_at);
       const monthsAgo = (new Date().getFullYear() - vd.getFullYear()) * 12 + new Date().getMonth() - vd.getMonth();
-      if (monthsAgo < 3 && buckets[2 - monthsAgo]) tally(buckets[2 - monthsAgo], v.status);
+      if (monthsAgo < 6 && buckets[5 - monthsAgo]) tally(buckets[5 - monthsAgo], v.status);
     });
   }
   return buckets;
@@ -128,7 +123,6 @@ function BarChart({ data, range }: { data: ChartPoint[]; range: TimeRange }) {
         ))}
       </div>
 
-      {/* Tooltip */}
       {hovered !== null && (
         <div className="absolute z-10 pointer-events-none"
           style={{ bottom: '100%', left: `calc(${(hovered / data.length) * 100 + (50 / data.length)}%)`, transform: 'translateX(-50%)', marginBottom: 6 }}>
@@ -142,21 +136,12 @@ function BarChart({ data, range }: { data: ChartPoint[]; range: TimeRange }) {
         </div>
       )}
 
-      {/* X-axis labels */}
       <div className="flex items-start gap-1.5 mt-2">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center overflow-hidden">
-            <span className={`block text-center font-mono leading-none transition-colors ${
-              hovered === i ? 'text-gray-700' : 'text-gray-400'
-            } ${is24h ? 'text-[9px]' : 'text-[10px]'}`}>
+            <span className={`block text-center font-mono leading-none transition-colors ${hovered === i ? 'text-gray-700' : 'text-gray-400'} ${is24h ? 'text-[9px]' : 'text-[10px]'}`}>
               {d.label}
             </span>
-            {/* Dot indicator: shows activity for 24h slots */}
-            {is24h && (
-              <span className={`mt-0.5 w-1 h-1 rounded-full transition-colors flex-shrink-0 ${
-                d.total > 0 ? 'bg-gray-300' : 'bg-transparent'
-              }`} />
-            )}
           </div>
         ))}
       </div>
@@ -233,10 +218,10 @@ function Sparkline({ data, color = '#c0283c' }: { data: number[]; color?: string
 // ── Time Range Selector ────────────────────────────────────────────────────────
 function TimeRangeSelector({ value, onChange }: { value: TimeRange; onChange: (v: TimeRange) => void }) {
   const opts: { label: string; value: TimeRange }[] = [
-    { label: '24h', value: '24h' },
-    { label: '7d',  value: '7d'  },
-    { label: '30d', value: '30d' },
-    { label: '90d', value: '90d' },
+    { label: '24h',  value: '24h' },
+    { label: '7d',   value: '7d'  },
+    { label: '30d',  value: '30d' },
+    { label: 'All',  value: 'all' },
   ];
   return (
     <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
@@ -255,33 +240,63 @@ function TimeRangeSelector({ value, onChange }: { value: TimeRange; onChange: (v
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { employee, loading: authLoading } = useAuth();
-  const [stats, setStats]   = useState<DashboardStats | null>(null);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [stats, setStats]       = useState<DashboardStats | null>(null);
+  const [visits, setVisits]     = useState<Visit[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h');
 
+  // Fetch visits for chart (all time, client-side filter)
   useEffect(() => {
     if (authLoading || !employee) return;
-    Promise.all([visitApi.stats(), visitApi.myVisits(undefined)])
-      .then(([s, v]) => { setStats(s.data); setVisits(v.data); })
+    visitApi.myVisits(undefined, false, undefined)
+      .then(r => setVisits(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [authLoading, employee]);
 
-  const recentVisits  = useMemo(() => visits.slice(0, 5), [visits]);
-  const chartData     = useMemo(() => buildChartData(visits, timeRange), [visits, timeRange]);
+  // Fetch stats whenever time range changes
+  const fetchStats = useCallback(async (range: TimeRange) => {
+    setStatsLoading(true);
+    try {
+      const { data } = await visitApi.stats(range);
+      setStats(data);
+    } catch {}
+    finally { setStatsLoading(false); }
+  }, []);
 
-  const rangeStats = useMemo(() => {
+  useEffect(() => {
+    if (authLoading || !employee) return;
+    fetchStats(timeRange);
+  }, [authLoading, employee, timeRange, fetchStats]);
+
+  const handleRangeChange = (range: TimeRange) => {
+    setTimeRange(range);
+  };
+
+  const recentVisits = useMemo(() => visits.slice(0, 5), [visits]);
+  const chartData    = useMemo(() => buildChartData(visits, timeRange), [visits, timeRange]);
+
+  // Filter visits for current range for donut
+  const rangeVisits = useMemo(() => {
     const now = Date.now();
-    const MS: Record<TimeRange, number> = { '24h': 86400000, '7d': 604800000, '30d': 2592000000, '90d': 7776000000 };
-    const f = visits.filter(v => now - new Date(v.created_at).getTime() <= MS[timeRange]);
-    return {
-      total:    f.length,
-      approved: f.filter(v => ['approved','checked_in','checked_out'].includes(v.status)).length,
-      pending:  f.filter(v => v.status === 'pending').length,
-      rejected: f.filter(v => v.status === 'rejected').length,
+    const MS: Record<TimeRange, number | null> = {
+      '24h': 86400000,
+      '7d':  604800000,
+      '30d': 2592000000,
+      'all': null,
     };
+    const ms = MS[timeRange];
+    if (!ms) return visits;
+    return visits.filter(v => now - new Date(v.created_at).getTime() <= ms);
   }, [visits, timeRange]);
+
+  const donutStats = useMemo(() => ({
+    total:    rangeVisits.length,
+    approved: rangeVisits.filter(v => ['approved','checked_in','checked_out'].includes(v.status)).length,
+    pending:  rangeVisits.filter(v => v.status === 'pending').length,
+    rejected: rangeVisits.filter(v => v.status === 'rejected').length,
+  }), [rangeVisits]);
 
   const sparklineData = useMemo(() => {
     const days = Array(7).fill(0);
@@ -293,31 +308,50 @@ export default function DashboardPage() {
     return days;
   }, [visits]);
 
-  const statCards = [
-    { label: 'Total Visits',   value: stats?.total    ?? '—', icon: Users,       color: 'blue',    sparkColor: '#3b82f6' },
-    { label: 'Pending',        value: stats?.pending  ?? '—', icon: Clock,       color: 'amber',   sparkColor: '#f59e0b' },
-    { label: 'Approved',       value: stats?.approved ?? '—', icon: CheckCircle, color: 'emerald', sparkColor: '#10b981' },
-    { label: "Today's Visits", value: stats?.today    ?? '—', icon: Calendar,    color: 'crimson', sparkColor: '#c0283c' },
-  ];
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-600', amber: 'bg-amber-50 text-amber-600',
-    emerald: 'bg-emerald-50 text-emerald-600', crimson: 'bg-crimson-50 text-crimson-600',
+  const rangeLabel: Record<TimeRange, string> = {
+    '24h': 'Last 24 hours',
+    '7d':  'Last 7 days',
+    '30d': 'Last 30 days',
+    'all': 'All time',
   };
-  const rangeLabel = { '24h': 'Last 24 hours', '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days' }[timeRange];
+
+  const statCards = [
+    { label: 'Total Visits', value: stats?.total    ?? '—', icon: Users,        color: 'blue',    sparkColor: '#3b82f6' },
+    { label: 'Pending',      value: stats?.pending  ?? '—', icon: Clock,        color: 'amber',   sparkColor: '#f59e0b' },
+    { label: 'Approved',     value: stats?.approved ?? '—', icon: CheckCircle,  color: 'emerald', sparkColor: '#10b981' },
+    { label: 'Rejected',     value: stats?.rejected ?? '—', icon: XCircle,      color: 'red',     sparkColor: '#ef4444' },
+  ];
+
+  const colorMap: Record<string, string> = {
+    blue:    'bg-blue-50 text-blue-600',
+    amber:   'bg-amber-50 text-amber-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    red:     'bg-red-50 text-red-600',
+    crimson: 'bg-crimson-50 text-crimson-600',
+  };
 
   return (
     <div className="animate-fade-in pb-8">
 
       {/* Header */}
-      <div className="mb-6 lg:mb-8">
-        <h1 className="font-display text-2xl lg:text-3xl font-bold text-gray-900">
-          Good {getGreeting()}, {employee?.name?.split(' ')[0]} 👋
-        </h1>
-        <p className="text-gray-500 mt-1 text-sm">Here's what's happening with your visits today.</p>
+      <div className="mb-5 lg:mb-6">
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="font-display text-2xl lg:text-3xl font-bold text-gray-900">
+              Good {getGreeting()}, {employee?.name?.split(' ')[0]} 👋
+            </h1>
+            <p className="text-gray-500 mt-1 text-sm">Here's what's happening with your visits.</p>
+          </div>
+          {/* Global time range selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-medium hidden sm:inline">Showing:</span>
+            <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
+          </div>
+        </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4 mb-5 lg:mb-8">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-4 mb-5 lg:mb-6">
         {statCards.map(({ label, value, icon: Icon, color, sparkColor }) => (
           <div key={label} className="stat-card animate-slide-up">
             <div className="flex items-start justify-between">
@@ -328,7 +362,9 @@ export default function DashboardPage() {
             </div>
             <div className="mt-2 lg:mt-3">
               <p className="text-2xl lg:text-3xl font-bold text-gray-900 font-display">
-                {loading ? <span className="inline-block w-8 h-7 bg-gray-100 rounded animate-pulse" /> : value}
+                {(loading || statsLoading)
+                  ? <span className="inline-block w-8 h-7 bg-gray-100 rounded animate-pulse" />
+                  : value}
               </p>
               <p className="text-xs lg:text-sm text-gray-500 mt-0.5">{label}</p>
             </div>
@@ -336,7 +372,16 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Range label */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex-1 h-px bg-gray-100" />
+        <span className="text-[11px] text-gray-400 font-medium px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+          {rangeLabel[timeRange]} · {donutStats.total} visits
+        </span>
+        <div className="flex-1 h-px bg-gray-100" />
+      </div>
+
+      {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 lg:gap-6 mb-4 lg:mb-6">
 
         {/* Bar chart */}
@@ -346,22 +391,16 @@ export default function DashboardPage() {
               <BarChart3 className="w-4 h-4 text-gray-400" />
               <h2 className="font-display font-bold text-gray-900 text-base lg:text-lg">Visit Activity</h2>
             </div>
-            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400" />Approved</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400" />Pending</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400" />Rejected</span>
+            </div>
           </div>
           {loading ? (
             <div className="h-32 bg-gray-50 rounded-xl animate-pulse" />
           ) : (
-            <>
-              <div className="flex items-center gap-3 mb-3 text-xs text-gray-400">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400" />Approved</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400" />Pending</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400" />Rejected</span>
-                {timeRange === '24h' && (
-                  <span className="ml-auto text-[9px] text-gray-300 italic">each bar = 3h window</span>
-                )}
-              </div>
-              <BarChart data={chartData} range={timeRange} />
-            </>
+            <BarChart data={chartData} range={timeRange} />
           )}
         </div>
 
@@ -375,22 +414,27 @@ export default function DashboardPage() {
             <div className="h-32 bg-gray-50 rounded-xl animate-pulse" />
           ) : (
             <>
-              <DonutChart approved={rangeStats.approved} pending={rangeStats.pending} rejected={rangeStats.rejected} total={rangeStats.total} />
+              <DonutChart
+                approved={donutStats.approved}
+                pending={donutStats.pending}
+                rejected={donutStats.rejected}
+                total={donutStats.total}
+              />
               <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-base lg:text-lg font-bold text-emerald-600">{rangeStats.approved}</p>
+                  <p className="text-base lg:text-lg font-bold text-emerald-600">{donutStats.approved}</p>
                   <p className="text-[10px] text-gray-400">Approved</p>
                 </div>
                 <div>
-                  <p className="text-base lg:text-lg font-bold text-amber-500">{rangeStats.pending}</p>
+                  <p className="text-base lg:text-lg font-bold text-amber-500">{donutStats.pending}</p>
                   <p className="text-[10px] text-gray-400">Pending</p>
                 </div>
                 <div>
-                  <p className="text-base lg:text-lg font-bold text-red-500">{rangeStats.rejected}</p>
+                  <p className="text-base lg:text-lg font-bold text-red-500">{donutStats.rejected}</p>
                   <p className="text-[10px] text-gray-400">Rejected</p>
                 </div>
               </div>
-              <p className="text-[10px] text-gray-400 text-center mt-2">{rangeLabel} · {rangeStats.total} visits</p>
+              <p className="text-[10px] text-gray-400 text-center mt-2">{rangeLabel[timeRange]}</p>
             </>
           )}
         </div>
@@ -463,6 +507,7 @@ export default function DashboardPage() {
               <ArrowRight className="w-4 h-4 text-gray-300 ml-auto group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
+
           <div className="mt-4 lg:mt-6 pt-4 lg:pt-5 border-t border-gray-100">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 lg:mb-3">Your Profile</p>
             <div className="space-y-1.5 lg:space-y-2">
@@ -476,14 +521,15 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          {!loading && rangeStats.total > 0 && (
+
+          {!loading && stats && stats.total > 0 && (
             <div className="mt-3 lg:mt-4 pt-3 lg:pt-4 border-t border-gray-100">
               <div className="flex items-start gap-2 text-xs text-gray-500 bg-gray-50 rounded-xl p-2.5 lg:p-3">
                 <TrendingUp className="w-3.5 h-3.5 mt-0.5 text-emerald-500 flex-shrink-0" />
                 <p>
-                  {rangeStats.approved > rangeStats.pending
-                    ? `${Math.round((rangeStats.approved / rangeStats.total) * 100)}% approval rate this period — great responsiveness!`
-                    : `${rangeStats.pending} visits still pending approval.`}
+                  {stats.approved > stats.pending
+                    ? `${stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}% approval rate — great responsiveness!`
+                    : `${stats.pending} visit${stats.pending !== 1 ? 's' : ''} still pending.`}
                 </p>
               </div>
             </div>

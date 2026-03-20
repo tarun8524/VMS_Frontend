@@ -11,10 +11,20 @@ export interface Visitor {
   name: string;
   phone: string;
   email: string;
-  employee_to_visit_id: string;
-  purpose?: string;
   thumbnail?: string;
   created_at?: string;
+  updated_at?: string;
+}
+
+export interface VisitorWithStats {
+  visitor_uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  thumbnail?: string;
+  total_visits: number;
+  rejected_visits: number;
+  last_visit?: string;
 }
 
 export type VisitStatus = 'pending' | 'approved' | 'rejected' | 'checked_in' | 'checked_out';
@@ -42,7 +52,9 @@ export interface DashboardStats {
   total: number;
   pending: number;
   approved: number;
+  rejected: number;
   today: number;
+  time_range: string;
 }
 
 export interface Location {
@@ -53,3 +65,5 @@ export interface Location {
   lng: string;
   maps_url: string;
 }
+
+export type TimeRange = '24h' | '7d' | '30d' | 'all';

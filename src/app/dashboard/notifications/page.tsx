@@ -16,16 +16,12 @@ function getDismissedIds(): Set<string> {
     const raw = localStorage.getItem(DISMISSED_KEY);
     if (!raw) return new Set();
     const { date, ids } = JSON.parse(raw);
-    // Reset dismissed list if it's from a previous day
-    const today = new Date().toDateString();
-    if (date !== today) {
+    if (date !== new Date().toDateString()) {
       localStorage.removeItem(DISMISSED_KEY);
       return new Set();
     }
     return new Set<string>(ids);
-  } catch {
-    return new Set();
-  }
+  } catch { return new Set(); }
 }
 
 function saveDismissedIds(ids: Set<string>) {
@@ -38,23 +34,19 @@ function saveDismissedIds(ids: Set<string>) {
 }
 
 function addDismissedId(id: string) {
-  const ids = getDismissedIds();
-  ids.add(id);
-  saveDismissedIds(ids);
+  const ids = getDismissedIds(); ids.add(id); saveDismissedIds(ids);
 }
 
-function clearDismissedIds() {
-  localStorage.removeItem(DISMISSED_KEY);
-}
+function clearDismissedIds() { localStorage.removeItem(DISMISSED_KEY); }
 
-/* ── Status badge ───────────────────────────────────────────────────────── */
+/* ── Status dot ─────────────────────────────────────────────────────────── */
 function StatusDot({ status }: { status: VisitStatus }) {
   const map: Record<string, { color: string; label: string }> = {
-    pending:     { color: 'bg-amber-400',   label: 'Pending'    },
-    approved:    { color: 'bg-emerald-400', label: 'Approved'   },
-    rejected:    { color: 'bg-red-400',     label: 'Rejected'   },
-    checked_in:  { color: 'bg-blue-400',    label: 'Checked In' },
-    checked_out: { color: 'bg-gray-400',    label: 'Checked Out'},
+    pending:     { color: 'bg-amber-400',   label: 'Pending'     },
+    approved:    { color: 'bg-emerald-400', label: 'Approved'    },
+    rejected:    { color: 'bg-red-400',     label: 'Rejected'    },
+    checked_in:  { color: 'bg-blue-400',    label: 'Checked In'  },
+    checked_out: { color: 'bg-gray-400',    label: 'Checked Out' },
   };
   const { color, label } = map[status] ?? { color: 'bg-gray-300', label: status };
   return (
@@ -198,10 +190,10 @@ function VisitCard({
   visit: v, onAction, onApprove, onDismiss, updating,
 }: {
   visit: Visit;
-  onAction: (id: string, s: VisitStatus) => void;
+  onAction:  (id: string, s: VisitStatus) => void;
   onApprove: () => void;
   onDismiss: (id: string) => void;
-  updating: string | null;
+  updating:  string | null;
 }) {
   const isRejected  = v.status === 'rejected';
   const isPending   = v.status === 'pending';
@@ -250,13 +242,9 @@ function VisitCard({
             </p>
           </div>
 
-          {/* Dismiss for rejected */}
           {isRejected && (
-            <button
-              onClick={() => onDismiss(v.visit_id)}
-              className="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center flex-shrink-0 transition-colors"
-              title="Remove from list"
-            >
+            <button onClick={() => onDismiss(v.visit_id)}
+              className="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 flex items-center justify-center flex-shrink-0 transition-colors">
               <Trash2 className="w-3.5 h-3.5 text-red-400" />
             </button>
           )}
@@ -267,8 +255,7 @@ function VisitCard({
           <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
             {isPending && (
               <>
-                <button onClick={onApprove}
-                  disabled={updating === v.visit_id + 'approved'}
+                <button onClick={onApprove} disabled={updating === v.visit_id + 'approved'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
                   style={{ background: '#059669' }}>
                   {updating === v.visit_id + 'approved'
@@ -276,8 +263,7 @@ function VisitCard({
                     : <UserCheck className="w-3.5 h-3.5" />}
                   Approve
                 </button>
-                <button onClick={() => onAction(v.visit_id, 'rejected')}
-                  disabled={updating === v.visit_id + 'rejected'}
+                <button onClick={() => onAction(v.visit_id, 'rejected')} disabled={updating === v.visit_id + 'rejected'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors">
                   {updating === v.visit_id + 'rejected'
                     ? <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
@@ -288,24 +274,21 @@ function VisitCard({
             )}
             {isApproved && (
               <>
-                <button onClick={() => onAction(v.visit_id, 'checked_in')}
-                  disabled={updating === v.visit_id + 'checked_in'}
+                <button onClick={() => onAction(v.visit_id, 'checked_in')} disabled={updating === v.visit_id + 'checked_in'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 transition-colors">
                   {updating === v.visit_id + 'checked_in'
                     ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     : <LogIn className="w-3.5 h-3.5" />}
                   Check In
                 </button>
-                <button onClick={() => onAction(v.visit_id, 'rejected')}
-                  disabled={updating === v.visit_id + 'rejected'}
+                <button onClick={() => onAction(v.visit_id, 'rejected')} disabled={updating === v.visit_id + 'rejected'}
                   className="w-10 flex items-center justify-center py-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50 transition-colors flex-shrink-0">
                   <X className="w-4 h-4" />
                 </button>
               </>
             )}
             {isCheckedIn && (
-              <button onClick={() => onAction(v.visit_id, 'checked_out')}
-                disabled={updating === v.visit_id + 'checked_out'}
+              <button onClick={() => onAction(v.visit_id, 'checked_out')} disabled={updating === v.visit_id + 'checked_out'}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-gray-700 hover:bg-gray-800 text-white disabled:opacity-50 transition-colors">
                 {updating === v.visit_id + 'checked_out'
                   ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -316,7 +299,6 @@ function VisitCard({
           </div>
         )}
 
-        {/* Rejected footer */}
         {isRejected && (
           <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
             <span className="text-xs text-red-400 font-medium">Visit rejected</span>
@@ -338,38 +320,27 @@ export default function NotificationsPage() {
   const [loading, setLoading]           = useState(true);
   const [updating, setUpdating]         = useState<string | null>(null);
   const [approveVisit, setApproveVisit] = useState<Visit | null>(null);
-  // dismissed IDs stored in state (source of truth = localStorage)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  // Load dismissed IDs from localStorage on mount
-  useEffect(() => {
-    setDismissedIds(getDismissedIds());
-  }, []);
+  useEffect(() => { setDismissedIds(getDismissedIds()); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: v }, { data: locs }] = await Promise.all([
-        // today_only=true so we only see today's visits
-        visitApi.myVisits(undefined, true),
+      const [notifRes, locRes] = await Promise.all([
+        visitApi.notifications(),   // ← uses new /my/notifications endpoint
         locationApi.list(),
       ]);
-      // Exclude checked_out
-      const filtered = (v as Visit[]).filter((x) => x.status !== 'checked_out');
-      setVisits(filtered);
-      setLocations(locs);
-    } catch {
-      toast.error('Failed to load');
-    } finally {
-      setLoading(false);
-    }
+      setVisits(notifRes.data as Visit[]);
+      setLocations(locRes.data);
+    } catch { toast.error('Failed to load'); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Derive visible visits: exclude dismissed rejected ones
   const visibleVisits = visits.filter(
-    (v) => !(v.status === 'rejected' && dismissedIds.has(v.visit_id))
+    v => !(v.status === 'rejected' && dismissedIds.has(v.visit_id))
   );
 
   const updateStatus = async (visitId: string, status: VisitStatus) => {
@@ -384,9 +355,7 @@ export default function NotificationsPage() {
       toast.success(`Visit ${status.replace('_', ' ')}`);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Update failed');
-    } finally {
-      setUpdating(null);
-    }
+    } finally { setUpdating(null); }
   };
 
   const handleApprove = async (locationId: string, requireOtp: boolean) => {
@@ -399,27 +368,20 @@ export default function NotificationsPage() {
       setApproveVisit(null);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Approval failed');
-    } finally {
-      setUpdating(null);
-    }
+    } finally { setUpdating(null); }
   };
 
-  // Dismiss: persist to localStorage so it survives refresh
   const dismissVisit = useCallback((visitId: string) => {
     addDismissedId(visitId);
     setDismissedIds(getDismissedIds());
     toast.success('Dismissed');
   }, []);
 
-  // Clear all rejected dismissed for today
   const clearAllRejected = useCallback(() => {
-    const rejectedIds = visibleVisits
-      .filter(v => v.status === 'rejected')
-      .map(v => v.visit_id);
-    const current = getDismissedIds();
-    rejectedIds.forEach(id => current.add(id));
-    saveDismissedIds(current);
-    setDismissedIds(new Set(current));
+    const ids = getDismissedIds();
+    visibleVisits.filter(v => v.status === 'rejected').forEach(v => ids.add(v.visit_id));
+    saveDismissedIds(ids);
+    setDismissedIds(new Set(ids));
     toast.success('All rejected visits dismissed');
   }, [visibleVisits]);
 
@@ -427,7 +389,6 @@ export default function NotificationsPage() {
   const active   = visibleVisits.filter(v => v.status === 'approved' || v.status === 'checked_in');
   const rejected = visibleVisits.filter(v => v.status === 'rejected');
 
-  // Today's date string for header
   const todayStr = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
@@ -456,7 +417,7 @@ export default function NotificationsPage() {
           </h1>
           <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {todayStr} · Showing today's visits only
+            {todayStr} · Today's visits only
           </p>
         </div>
         <button onClick={load} className="btn-secondary flex-shrink-0">
@@ -479,8 +440,7 @@ export default function NotificationsPage() {
           <p className="font-semibold text-gray-600">All caught up!</p>
           <p className="text-xs text-gray-400 mt-1">No visits today yet</p>
         </div>
-      ) : visibleVisits.length === 0 && visits.length > 0 ? (
-        /* All rejected visits dismissed */
+      ) : visibleVisits.length === 0 ? (
         <div className="card text-center py-16">
           <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Bell className="w-7 h-7 text-gray-300" />
@@ -490,10 +450,7 @@ export default function NotificationsPage() {
             {visits.length} visit{visits.length !== 1 ? 's' : ''} today — all dismissed
           </p>
           <button
-            onClick={() => {
-              clearDismissedIds();
-              setDismissedIds(new Set());
-            }}
+            onClick={() => { clearDismissedIds(); setDismissedIds(new Set()); }}
             className="mt-3 text-xs text-crimson-600 hover:text-crimson-700 font-medium underline underline-offset-2"
           >
             Restore dismissed
@@ -502,7 +459,6 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-5">
 
-          {/* Pending */}
           {pending.length > 0 && (
             <section>
               <div className="flex items-center gap-2 mb-3">
@@ -514,16 +470,13 @@ export default function NotificationsPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {pending.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus}
-                    onApprove={() => setApproveVisit(v)}
-                    onDismiss={dismissVisit}
-                    updating={updating} />
+                    onAction={updateStatus} onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit} updating={updating} />
                 ))}
               </div>
             </section>
           )}
 
-          {/* Active */}
           {active.length > 0 && (
             <section>
               <div className="flex items-center gap-2 mb-3">
@@ -535,16 +488,13 @@ export default function NotificationsPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {active.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus}
-                    onApprove={() => setApproveVisit(v)}
-                    onDismiss={dismissVisit}
-                    updating={updating} />
+                    onAction={updateStatus} onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit} updating={updating} />
                 ))}
               </div>
             </section>
           )}
 
-          {/* Rejected — dismissible */}
           {rejected.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
@@ -554,20 +504,16 @@ export default function NotificationsPage() {
                     Rejected ({rejected.length})
                   </h2>
                 </div>
-                <button
-                  onClick={clearAllRejected}
-                  className="text-xs text-gray-400 hover:text-red-500 font-medium flex items-center gap-1 transition-colors"
-                >
+                <button onClick={clearAllRejected}
+                  className="text-xs text-gray-400 hover:text-red-500 font-medium flex items-center gap-1 transition-colors">
                   <Trash2 className="w-3 h-3" />Clear all
                 </button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {rejected.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus}
-                    onApprove={() => setApproveVisit(v)}
-                    onDismiss={dismissVisit}
-                    updating={updating} />
+                    onAction={updateStatus} onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit} updating={updating} />
                 ))}
               </div>
             </section>
