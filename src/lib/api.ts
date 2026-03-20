@@ -58,7 +58,13 @@ export const visitorApi = {
 
 // ── Visits ────────────────────────────────────────────────────────────────────
 export const visitApi = {
-  myVisits:     (status?: string) => api.get('/visits/my', { params: status ? { status } : {} }),
+  myVisits:     (status?: string, todayOnly?: boolean) =>
+    api.get('/visits/my', {
+      params: {
+        ...(status ? { status } : {}),
+        ...(todayOnly ? { today_only: true } : {}),
+      },
+    }),
   stats:        ()                 => api.get('/visits/my/stats'),
   pendingCount: ()                 => api.get('/visits/my/pending-count'),
   search:       (q: string)        => api.get('/visits/my/search', { params: { q } }),

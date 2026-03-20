@@ -1,21 +1,60 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
-  Bell, Check, X, RefreshCw, Clock, LogIn, LogOut,
-  MapPin, KeyRound, ExternalLink, Trash2, UserCheck,
+  Bell, Check, X, RefreshCw, LogIn, LogOut,
+  MapPin, KeyRound, ExternalLink, Trash2, UserCheck, Calendar,
 } from 'lucide-react';
 import { visitApi, locationApi } from '@/lib/api';
 import { Visit, VisitStatus, Location } from '@/types';
 import toast from 'react-hot-toast';
 
-/* ── Status badge (inline, compact) ────────────────────────────────────── */
+/* ── localStorage helpers for dismissed visit IDs ──────────────────────── */
+const DISMISSED_KEY = 'vms_dismissed_visits';
+
+function getDismissedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    if (!raw) return new Set();
+    const { date, ids } = JSON.parse(raw);
+    // Reset dismissed list if it's from a previous day
+    const today = new Date().toDateString();
+    if (date !== today) {
+      localStorage.removeItem(DISMISSED_KEY);
+      return new Set();
+    }
+    return new Set<string>(ids);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDismissedIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(
+      DISMISSED_KEY,
+      JSON.stringify({ date: new Date().toDateString(), ids: Array.from(ids) })
+    );
+  } catch {}
+}
+
+function addDismissedId(id: string) {
+  const ids = getDismissedIds();
+  ids.add(id);
+  saveDismissedIds(ids);
+}
+
+function clearDismissedIds() {
+  localStorage.removeItem(DISMISSED_KEY);
+}
+
+/* ── Status badge ───────────────────────────────────────────────────────── */
 function StatusDot({ status }: { status: VisitStatus }) {
   const map: Record<string, { color: string; label: string }> = {
-    pending:     { color: 'bg-amber-400',  label: 'Pending'    },
-    approved:    { color: 'bg-emerald-400',label: 'Approved'   },
-    rejected:    { color: 'bg-red-400',    label: 'Rejected'   },
-    checked_in:  { color: 'bg-blue-400',   label: 'Checked In' },
-    checked_out: { color: 'bg-gray-400',   label: 'Checked Out'},
+    pending:     { color: 'bg-amber-400',   label: 'Pending'    },
+    approved:    { color: 'bg-emerald-400', label: 'Approved'   },
+    rejected:    { color: 'bg-red-400',     label: 'Rejected'   },
+    checked_in:  { color: 'bg-blue-400',    label: 'Checked In' },
+    checked_out: { color: 'bg-gray-400',    label: 'Checked Out'},
   };
   const { color, label } = map[status] ?? { color: 'bg-gray-300', label: status };
   return (
@@ -48,7 +87,7 @@ function ApproveModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" style={{paddingBottom:72}}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" style={{ paddingBottom: 72 }}>
       <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={onClose} />
       <div
         className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col animate-slide-up overflow-hidden"
@@ -89,15 +128,15 @@ function ApproveModal({
             <div className="space-y-2">
               {locations.map(loc => (
                 <label key={loc.location_id}
-                  className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${locationId===loc.location_id?'border-emerald-400 bg-emerald-50':'border-gray-200 bg-white hover:border-gray-300'}`}>
+                  className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${locationId === loc.location_id ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
                   <input type="radio" name="location" value={loc.location_id}
-                    checked={locationId===loc.location_id} onChange={()=>setLocationId(loc.location_id)}
+                    checked={locationId === loc.location_id} onChange={() => setLocationId(loc.location_id)}
                     className="mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 text-sm">{loc.name}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{loc.address}</p>
                     <a href={loc.maps_url} target="_blank" rel="noopener noreferrer"
-                      onClick={e=>e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
                       className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1 font-medium">
                       <ExternalLink className="w-3 h-3" />Open in Maps
                     </a>
@@ -109,20 +148,20 @@ function ApproveModal({
 
           {/* OTP toggle */}
           <div
-            className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${requireOtp?'border-blue-300 bg-blue-50':'border-gray-200 bg-gray-50'}`}
-            onClick={()=>setRequireOtp(!requireOtp)}
+            className={`flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer transition-all ${requireOtp ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}
+            onClick={() => setRequireOtp(!requireOtp)}
           >
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${requireOtp?'bg-blue-100':'bg-gray-100'}`}>
-                <KeyRound className={`w-4 h-4 ${requireOtp?'text-blue-600':'text-gray-400'}`} />
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${requireOtp ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                <KeyRound className={`w-4 h-4 ${requireOtp ? 'text-blue-600' : 'text-gray-400'}`} />
               </div>
               <div>
                 <p className="font-semibold text-gray-900 text-sm">Require OTP</p>
-                <p className="text-xs text-gray-400">{requireOtp?'OTP emailed to visitor':'Location only, no OTP'}</p>
+                <p className="text-xs text-gray-400">{requireOtp ? 'OTP emailed to visitor' : 'Location only, no OTP'}</p>
               </div>
             </div>
-            <div className="relative w-10 h-5 rounded-full flex-shrink-0" style={{background:requireOtp?'#3b82f6':'#d1d5db'}}>
-              <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all" style={{left:requireOtp?'22px':'2px'}} />
+            <div className="relative w-10 h-5 rounded-full flex-shrink-0" style={{ background: requireOtp ? '#3b82f6' : '#d1d5db' }}>
+              <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all" style={{ left: requireOtp ? '22px' : '2px' }} />
             </div>
           </div>
 
@@ -130,7 +169,7 @@ function ApproveModal({
             <div className="text-xs bg-gray-50 rounded-xl p-3 border border-gray-100 space-y-1 text-gray-500">
               <p className="font-semibold text-gray-700">Visitor email will include:</p>
               <p>📍 <strong className="text-gray-900">{selectedLoc.name}</strong></p>
-              <p>{requireOtp?'🔐 A 6-digit OTP':'✅ No OTP required'}</p>
+              <p>{requireOtp ? '🔐 A 6-digit OTP' : '✅ No OTP required'}</p>
             </div>
           )}
         </div>
@@ -140,13 +179,13 @@ function ApproveModal({
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={submitting||!locationId}
+          <button onClick={handleSubmit} disabled={submitting || !locationId}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white font-semibold text-sm disabled:opacity-50 transition-colors"
-            style={{background:'#059669'}}>
+            style={{ background: '#059669' }}>
             {submitting
-              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-              : <Check className="w-4 h-4"/>}
-            {submitting?'Approving…':'Approve & Notify'}
+              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Check className="w-4 h-4" />}
+            {submitting ? 'Approving…' : 'Approve & Notify'}
           </button>
         </div>
       </div>
@@ -164,10 +203,10 @@ function VisitCard({
   onDismiss: (id: string) => void;
   updating: string | null;
 }) {
-  const isRejected   = v.status === 'rejected';
-  const isPending    = v.status === 'pending';
-  const isApproved   = v.status === 'approved';
-  const isCheckedIn  = v.status === 'checked_in';
+  const isRejected  = v.status === 'rejected';
+  const isPending   = v.status === 'pending';
+  const isApproved  = v.status === 'approved';
+  const isCheckedIn = v.status === 'checked_in';
 
   const borderColor = isPending ? '#fbbf24' : isApproved ? '#34d399' : isCheckedIn ? '#60a5fa' : '#f87171';
 
@@ -177,7 +216,7 @@ function VisitCard({
       style={{ borderLeft: `3px solid ${borderColor}` }}
     >
       <div className="p-3 lg:p-4">
-        {/* Top row: avatar + info + status + dismiss */}
+        {/* Top row */}
         <div className="flex items-start gap-3">
           {v.visitor_thumbnail
             ? <img src={`data:image/jpeg;base64,${v.visitor_thumbnail}`}
@@ -207,11 +246,11 @@ function VisitCard({
               )}
             </div>
             <p className="text-[10px] text-gray-300 mt-1">
-              {new Date(v.created_at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+              {new Date(v.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
 
-          {/* Dismiss button for rejected */}
+          {/* Dismiss for rejected */}
           {isRejected && (
             <button
               onClick={() => onDismiss(v.visit_id)}
@@ -223,7 +262,7 @@ function VisitCard({
           )}
         </div>
 
-        {/* Action buttons — only for non-rejected */}
+        {/* Action buttons */}
         {!isRejected && (
           <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
             {isPending && (
@@ -231,59 +270,59 @@ function VisitCard({
                 <button onClick={onApprove}
                   disabled={updating === v.visit_id + 'approved'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-colors"
-                  style={{background:'#059669'}}>
-                  {updating===v.visit_id+'approved'
-                    ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                    : <UserCheck className="w-3.5 h-3.5"/>}
+                  style={{ background: '#059669' }}>
+                  {updating === v.visit_id + 'approved'
+                    ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <UserCheck className="w-3.5 h-3.5" />}
                   Approve
                 </button>
-                <button onClick={()=>onAction(v.visit_id,'rejected')}
-                  disabled={updating===v.visit_id+'rejected'}
+                <button onClick={() => onAction(v.visit_id, 'rejected')}
+                  disabled={updating === v.visit_id + 'rejected'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors">
-                  {updating===v.visit_id+'rejected'
-                    ? <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"/>
-                    : <X className="w-3.5 h-3.5"/>}
+                  {updating === v.visit_id + 'rejected'
+                    ? <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                    : <X className="w-3.5 h-3.5" />}
                   Reject
                 </button>
               </>
             )}
             {isApproved && (
               <>
-                <button onClick={()=>onAction(v.visit_id,'checked_in')}
-                  disabled={updating===v.visit_id+'checked_in'}
+                <button onClick={() => onAction(v.visit_id, 'checked_in')}
+                  disabled={updating === v.visit_id + 'checked_in'}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 transition-colors">
-                  {updating===v.visit_id+'checked_in'
-                    ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                    : <LogIn className="w-3.5 h-3.5"/>}
+                  {updating === v.visit_id + 'checked_in'
+                    ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <LogIn className="w-3.5 h-3.5" />}
                   Check In
                 </button>
-                <button onClick={()=>onAction(v.visit_id,'rejected')}
-                  disabled={updating===v.visit_id+'rejected'}
+                <button onClick={() => onAction(v.visit_id, 'rejected')}
+                  disabled={updating === v.visit_id + 'rejected'}
                   className="w-10 flex items-center justify-center py-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-50 transition-colors flex-shrink-0">
-                  <X className="w-4 h-4"/>
+                  <X className="w-4 h-4" />
                 </button>
               </>
             )}
             {isCheckedIn && (
-              <button onClick={()=>onAction(v.visit_id,'checked_out')}
-                disabled={updating===v.visit_id+'checked_out'}
+              <button onClick={() => onAction(v.visit_id, 'checked_out')}
+                disabled={updating === v.visit_id + 'checked_out'}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 lg:py-2.5 rounded-xl text-sm font-semibold bg-gray-700 hover:bg-gray-800 text-white disabled:opacity-50 transition-colors">
-                {updating===v.visit_id+'checked_out'
-                  ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                  : <LogOut className="w-3.5 h-3.5"/>}
+                {updating === v.visit_id + 'checked_out'
+                  ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <LogOut className="w-3.5 h-3.5" />}
                 Check Out
               </button>
             )}
           </div>
         )}
 
-        {/* Rejected: show label + dismiss hint */}
+        {/* Rejected footer */}
         {isRejected && (
           <div className="mt-2 pt-2 border-t border-gray-50 flex items-center justify-between">
             <span className="text-xs text-red-400 font-medium">Visit rejected</span>
-            <button onClick={()=>onDismiss(v.visit_id)}
+            <button onClick={() => onDismiss(v.visit_id)}
               className="text-xs text-gray-400 hover:text-red-500 font-medium flex items-center gap-1 transition-colors">
-              <Trash2 className="w-3 h-3"/>Dismiss
+              <Trash2 className="w-3 h-3" />Dismiss
             </button>
           </div>
         )}
@@ -294,37 +333,60 @@ function VisitCard({
 
 /* ── Main page ──────────────────────────────────────────────────────────── */
 export default function NotificationsPage() {
-  const [visits, setVisits]         = useState<Visit[]>([]);
-  const [locations, setLocations]   = useState<Location[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [updating, setUpdating]     = useState<string | null>(null);
+  const [visits, setVisits]             = useState<Visit[]>([]);
+  const [locations, setLocations]       = useState<Location[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [updating, setUpdating]         = useState<string | null>(null);
   const [approveVisit, setApproveVisit] = useState<Visit | null>(null);
+  // dismissed IDs stored in state (source of truth = localStorage)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  const load = async () => {
+  // Load dismissed IDs from localStorage on mount
+  useEffect(() => {
+    setDismissedIds(getDismissedIds());
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data: v }, { data: locs }] = await Promise.all([visitApi.myVisits(), locationApi.list()]);
-      // Keep all except checked_out
-      setVisits(v.filter((x: Visit) => x.status !== 'checked_out'));
+      const [{ data: v }, { data: locs }] = await Promise.all([
+        // today_only=true so we only see today's visits
+        visitApi.myVisits(undefined, true),
+        locationApi.list(),
+      ]);
+      // Exclude checked_out
+      const filtered = (v as Visit[]).filter((x) => x.status !== 'checked_out');
+      setVisits(filtered);
       setLocations(locs);
-    } catch { toast.error('Failed to load'); }
-    finally { setLoading(false); }
-  };
+    } catch {
+      toast.error('Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+
+  // Derive visible visits: exclude dismissed rejected ones
+  const visibleVisits = visits.filter(
+    (v) => !(v.status === 'rejected' && dismissedIds.has(v.visit_id))
+  );
 
   const updateStatus = async (visitId: string, status: VisitStatus) => {
     setUpdating(visitId + status);
     try {
       const { data } = await visitApi.updateStatus(visitId, status);
       setVisits(prev =>
-        prev.map(v => v.visit_id === visitId ? { ...v, ...data } : v)
-            .filter(v => v.status !== 'checked_out')
+        prev
+          .map(v => v.visit_id === visitId ? { ...v, ...data } : v)
+          .filter(v => v.status !== 'checked_out')
       );
       toast.success(`Visit ${status.replace('_', ' ')}`);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Update failed');
-    } finally { setUpdating(null); }
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const handleApprove = async (locationId: string, requireOtp: boolean) => {
@@ -337,28 +399,52 @@ export default function NotificationsPage() {
       setApproveVisit(null);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Approval failed');
-    } finally { setUpdating(null); }
+    } finally {
+      setUpdating(null);
+    }
   };
 
-  // Dismiss (remove from local state) rejected visits
-  const dismissVisit = (visitId: string) => {
-    setVisits(prev => prev.filter(v => v.visit_id !== visitId));
+  // Dismiss: persist to localStorage so it survives refresh
+  const dismissVisit = useCallback((visitId: string) => {
+    addDismissedId(visitId);
+    setDismissedIds(getDismissedIds());
     toast.success('Dismissed');
-  };
+  }, []);
 
-  const pending  = visits.filter(v => v.status === 'pending');
-  const active   = visits.filter(v => v.status === 'approved' || v.status === 'checked_in');
-  const rejected = visits.filter(v => v.status === 'rejected');
+  // Clear all rejected dismissed for today
+  const clearAllRejected = useCallback(() => {
+    const rejectedIds = visibleVisits
+      .filter(v => v.status === 'rejected')
+      .map(v => v.visit_id);
+    const current = getDismissedIds();
+    rejectedIds.forEach(id => current.add(id));
+    saveDismissedIds(current);
+    setDismissedIds(new Set(current));
+    toast.success('All rejected visits dismissed');
+  }, [visibleVisits]);
+
+  const pending  = visibleVisits.filter(v => v.status === 'pending');
+  const active   = visibleVisits.filter(v => v.status === 'approved' || v.status === 'checked_in');
+  const rejected = visibleVisits.filter(v => v.status === 'rejected');
+
+  // Today's date string for header
+  const todayStr = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
 
   return (
     <div className="animate-fade-in">
       {approveVisit && (
-        <ApproveModal visit={approveVisit} locations={locations}
-          onConfirm={handleApprove} onClose={() => setApproveVisit(null)} />
+        <ApproveModal
+          visit={approveVisit}
+          locations={locations}
+          onConfirm={handleApprove}
+          onClose={() => setApproveVisit(null)}
+        />
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 lg:mb-5">
+      <div className="flex items-start justify-between mb-4 lg:mb-5">
         <div>
           <h1 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center gap-2">
             Visitor Approvals
@@ -368,9 +454,12 @@ export default function NotificationsPage() {
               </span>
             )}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">Review and manage incoming visitor requests</p>
+          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {todayStr} · Showing today's visits only
+          </p>
         </div>
-        <button onClick={load} className="btn-secondary">
+        <button onClick={load} className="btn-secondary flex-shrink-0">
           <RefreshCw className="w-4 h-4" />
           <span className="hidden sm:inline">Refresh</span>
         </button>
@@ -378,15 +467,37 @@ export default function NotificationsPage() {
 
       {loading ? (
         <div className="grid gap-3">
-          {[...Array(3)].map((_,i) => <div key={i} className="h-28 bg-white rounded-xl border border-gray-100 animate-pulse"/>)}
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-28 bg-white rounded-xl border border-gray-100 animate-pulse" />
+          ))}
         </div>
-      ) : visits.length === 0 ? (
+      ) : visibleVisits.length === 0 && visits.length === 0 ? (
         <div className="card text-center py-16">
           <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
             <Bell className="w-7 h-7 text-gray-300" />
           </div>
           <p className="font-semibold text-gray-600">All caught up!</p>
-          <p className="text-xs text-gray-400 mt-1">No pending or active visits right now</p>
+          <p className="text-xs text-gray-400 mt-1">No visits today yet</p>
+        </div>
+      ) : visibleVisits.length === 0 && visits.length > 0 ? (
+        /* All rejected visits dismissed */
+        <div className="card text-center py-16">
+          <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <Bell className="w-7 h-7 text-gray-300" />
+          </div>
+          <p className="font-semibold text-gray-600">All caught up!</p>
+          <p className="text-xs text-gray-400 mt-1">
+            {visits.length} visit{visits.length !== 1 ? 's' : ''} today — all dismissed
+          </p>
+          <button
+            onClick={() => {
+              clearDismissedIds();
+              setDismissedIds(new Set());
+            }}
+            className="mt-3 text-xs text-crimson-600 hover:text-crimson-700 font-medium underline underline-offset-2"
+          >
+            Restore dismissed
+          </button>
         </div>
       ) : (
         <div className="space-y-5">
@@ -403,8 +514,10 @@ export default function NotificationsPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {pending.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus} onApprove={()=>setApproveVisit(v)}
-                    onDismiss={dismissVisit} updating={updating} />
+                    onAction={updateStatus}
+                    onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit}
+                    updating={updating} />
                 ))}
               </div>
             </section>
@@ -422,8 +535,10 @@ export default function NotificationsPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {active.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus} onApprove={()=>setApproveVisit(v)}
-                    onDismiss={dismissVisit} updating={updating} />
+                    onAction={updateStatus}
+                    onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit}
+                    updating={updating} />
                 ))}
               </div>
             </section>
@@ -440,7 +555,7 @@ export default function NotificationsPage() {
                   </h2>
                 </div>
                 <button
-                  onClick={() => setVisits(prev => prev.filter(v => v.status !== 'rejected'))}
+                  onClick={clearAllRejected}
                   className="text-xs text-gray-400 hover:text-red-500 font-medium flex items-center gap-1 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />Clear all
@@ -449,12 +564,15 @@ export default function NotificationsPage() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {rejected.map(v => (
                   <VisitCard key={v.visit_id} visit={v}
-                    onAction={updateStatus} onApprove={()=>setApproveVisit(v)}
-                    onDismiss={dismissVisit} updating={updating} />
+                    onAction={updateStatus}
+                    onApprove={() => setApproveVisit(v)}
+                    onDismiss={dismissVisit}
+                    updating={updating} />
                 ))}
               </div>
             </section>
           )}
+
         </div>
       )}
     </div>
