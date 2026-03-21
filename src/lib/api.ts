@@ -51,6 +51,30 @@ export const visitorApi = {
   delete:     (uid: string)  => api.delete(`/visitors/${uid}`),
   recognize:  (fd: FormData) => api.post('/visitors/recognize', fd),
   myVisitors: ()             => api.get('/visitors/my-visitors'),
+
+  /** Verify returning visitor by phone + email */
+  verifyIdentity: (visitor_uid: string, phone: string, email: string) => {
+    const fd = new FormData();
+    fd.append('visitor_uid', visitor_uid);
+    fd.append('phone', phone);
+    fd.append('email', email);
+    return api.post('/visitors/verify-identity', fd);
+  },
+
+  /** Update visitor contact details (partial) */
+  updateDetails: (visitor_uid: string, fields: {
+    name?: string;
+    phone?: string;
+    email?: string;
+    photo?: Blob;
+  }) => {
+    const fd = new FormData();
+    if (fields.name)  fd.append('name',  fields.name);
+    if (fields.phone) fd.append('phone', fields.phone);
+    if (fields.email) fd.append('email', fields.email);
+    if (fields.photo) fd.append('photo', fields.photo, 'photo.jpg');
+    return api.patch(`/visitors/${visitor_uid}/details`, fd);
+  },
 };
 
 // ── Visits ────────────────────────────────────────────────────────────────────
