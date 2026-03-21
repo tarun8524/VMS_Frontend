@@ -13,6 +13,7 @@ interface EmpResult {
   name: string;
   employee_id: string;
   department?: string;
+  thumbnail?: string;
 }
 
 export function EmployeeSearch({ value, onChange, error }: Props) {
@@ -26,7 +27,7 @@ export function EmployeeSearch({ value, onChange, error }: Props) {
 
   // Preload all employees once
   useEffect(() => {
-    employeeApi.list().then((r) => setResults(r.data)).catch(() => {});
+    employeeApi.list().then(r => setResults(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export function EmployeeSearch({ value, onChange, error }: Props) {
           type="text"
           placeholder="Search by name or ID (e.g. R098)…"
           value={query}
-          onChange={(e) => handleInput(e.target.value)}
+          onChange={e => handleInput(e.target.value)}
           onFocus={() => setOpen(true)}
           className="w-full pl-9 pr-4 py-2.5 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none"
         />
@@ -82,23 +83,27 @@ export function EmployeeSearch({ value, onChange, error }: Props) {
 
       {open && results.length > 0 && (
         <div className="absolute z-50 top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-card-lg max-h-52 overflow-y-auto animate-fade-in">
-          {results.map((emp) => (
+          {results.map(emp => (
             <button
               key={emp.employee_id}
               type="button"
               onClick={() => pick(emp)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-crimson-50 transition-colors text-left group"
             >
-              <div className="w-8 h-8 rounded-full bg-crimson-100 flex items-center justify-center flex-shrink-0">
-                <User className="w-4 h-4 text-crimson-600" />
-              </div>
+              {emp.thumbnail ? (
+                <img
+                  src={`data:image/jpeg;base64,${emp.thumbnail}`}
+                  alt={emp.name}
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-crimson-100 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 text-crimson-600" />
+                </div>
+              )}
               <div>
-                <p className="text-sm font-semibold text-gray-900 group-hover:text-crimson-800">
-                  {emp.name}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {emp.employee_id}{emp.department ? ` · ${emp.department}` : ''}
-                </p>
+                <p className="text-sm font-semibold text-gray-900 group-hover:text-crimson-800">{emp.name}</p>
+                <p className="text-xs text-gray-400">{emp.employee_id}{emp.department ? ` · ${emp.department}` : ''}</p>
               </div>
             </button>
           ))}

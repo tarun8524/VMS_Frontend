@@ -8,7 +8,7 @@ export const api = axios.create({
   headers: { 'ngrok-skip-browser-warning': 'true' },
 });
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(config => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('vms_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -17,8 +17,8 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (res) => res,
-  (err) => {
+  res => res,
+  err => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('vms_token');
       localStorage.removeItem('vms_employee');
@@ -30,43 +30,69 @@ api.interceptors.response.use(
 
 // ── Auth ───────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login:    (email: string, password: string) =>
-    api.post('/auth/login', { email, password }),
-  register: (data: Record<string, string>) =>
-    api.post('/auth/register', data),
+  login: (email: string, password: string) => {
+    const fd = new FormData();
+    fd.append('email', email);
+    fd.append('password', password);
+    return api.post('/auth/login', fd);
+  },
+  register: (data: {
+    name: string;
+    email: string;
+    employee_id: string;
+    department?: string;
+    phone?: string;        // full E.164 e.g. +919876543210
+    password: string;
+    photo?: Blob | null;
+  }) => {
+    const fd = new FormData();
+    fd.append('name',        data.name);
+    fd.append('email',       data.email);
+    fd.append('employee_id', data.employee_id);
+    if (data.department) fd.append('department', data.department);
+    if (data.phone)      fd.append('phone',      data.phone);
+    fd.append('password', data.password);
+    if (data.photo)      fd.append('photo', data.photo, 'photo.jpg');
+    return api.post('/auth/register', fd);
+  },
 };
 
 // ── Employees ─────────────────────────────────────────────────────────────────
 export const employeeApi = {
-  search: (q: string) => api.get('/employees/search', { params: { q } }),
-  list:   ()          => api.get('/employees/'),
-  me:     ()          => api.get('/employees/me'),
+  search:      (q: string)   => api.get('/employees/search', { params: { q } }),
+  list:        ()            => api.get('/employees/'),
+  me:          ()            => api.get('/employees/me'),
+  uploadPhoto: (photo: Blob) => {
+    const fd = new FormData();
+    fd.append('photo', photo, 'photo.jpg');
+    return api.patch('/employees/me/photo', fd);
+  },
+  updatePhone: (phone: string) => {
+    const fd = new FormData();
+    fd.append('phone', phone);
+    return api.patch('/employees/me/phone', fd);
+  },
 };
 
 // ── Visitors ──────────────────────────────────────────────────────────────────
 export const visitorApi = {
-  register:   (fd: FormData) => api.post('/visitors/', fd),
-  list:       ()             => api.get('/visitors/'),
-  get:        (uid: string)  => api.get(`/visitors/${uid}`),
-  delete:     (uid: string)  => api.delete(`/visitors/${uid}`),
-  recognize:  (fd: FormData) => api.post('/visitors/recognize', fd),
-  myVisitors: ()             => api.get('/visitors/my-visitors'),
+  register:   (fd: FormData)  => api.post('/visitors/', fd),
+  list:       ()              => api.get('/visitors/'),
+  get:        (uid: string)   => api.get(`/visitors/${uid}`),
+  delete:     (uid: string)   => api.delete(`/visitors/${uid}`),
+  recognize:  (fd: FormData)  => api.post('/visitors/recognize', fd),
+  myVisitors: ()              => api.get('/visitors/my-visitors'),
 
-  /** Verify returning visitor by phone + email */
   verifyIdentity: (visitor_uid: string, phone: string, email: string) => {
     const fd = new FormData();
     fd.append('visitor_uid', visitor_uid);
-    fd.append('phone', phone);
-    fd.append('email', email);
+    fd.append('phone',       phone);
+    fd.append('email',       email);
     return api.post('/visitors/verify-identity', fd);
   },
 
-  /** Update visitor contact details (partial) */
   updateDetails: (visitor_uid: string, fields: {
-    name?: string;
-    phone?: string;
-    email?: string;
-    photo?: Blob;
+    name?: string; phone?: string; email?: string; photo?: Blob;
   }) => {
     const fd = new FormData();
     if (fields.name)  fd.append('name',  fields.name);
@@ -79,7 +105,6 @@ export const visitorApi = {
 
 // ── Visits ────────────────────────────────────────────────────────────────────
 export const visitApi = {
-  // General visit list — filter by status / date / today
   myVisits: (status?: string, todayOnly?: boolean, date?: string) =>
     api.get('/visits/my', {
       params: {
@@ -89,33 +114,16 @@ export const visitApi = {
       },
     }),
 
-  // Today's visits for the approvals page (excludes checked_out)
-  notifications: () => api.get('/visits/my/notifications'),
+  notifications:   ()                      => api.get('/visits/my/notifications'),
+  stats:           (range: string = '24h') => api.get('/visits/my/stats',      { params: { range } }),
+  chartData:       (range: string = '7d')  => api.get('/visits/my/chart-data', { params: { range } }),
+  pendingCount:    ()                      => api.get('/visits/my/pending-count'),
+  search:          (q: string)             => api.get('/visits/my/search',     { params: { q } }),
+  visitorRecords:  (visitorUid: string)    => api.get(`/visits/my/visitor/${visitorUid}`),
 
-  // Dashboard stat cards — respects time range
-  stats: (range: string = '24h') =>
-    api.get('/visits/my/stats', { params: { range } }),
-
-  // Lightweight list for chart rendering
-  chartData: (range: string = '7d') =>
-    api.get('/visits/my/chart-data', { params: { range } }),
-
-  // Notification badge count
-  pendingCount: () => api.get('/visits/my/pending-count'),
-
-  // Text search across visitor name / email / phone
-  search: (q: string) => api.get('/visits/my/search', { params: { q } }),
-
-  // All visit records by a specific visitor for this employee
-  visitorRecords: (visitorUid: string) =>
-    api.get(`/visits/my/visitor/${visitorUid}`),
-
-  // Status update (approve / reject / check-in / check-out)
   updateStatus: (
-    visitId: string,
-    status: string,
-    location_id?: string,
-    require_otp?: boolean,
+    visitId: string, status: string,
+    location_id?: string, require_otp?: boolean,
   ) => api.patch(`/visits/${visitId}/status`, { status, location_id, require_otp }),
 };
 

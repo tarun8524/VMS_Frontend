@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useCallback } from 'react';
-import { Camera, RefreshCw, Upload, X } from 'lucide-react';
+import { Camera, RefreshCw, Upload, X, ZapIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Props {
@@ -62,64 +62,94 @@ export function CameraCapture({ onCapture, onClear }: Props) {
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Viewport */}
-      <div className="relative w-full aspect-[4/3] bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 overflow-hidden flex items-center justify-center">
-        {capturing && (
+    <div className="flex flex-col gap-2">
+
+      {/* ── Live camera feed ── */}
+      {capturing && (
+        <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden bg-black">
           <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-        )}
-        {preview && !capturing && (
-          <img src={preview} alt="Captured" className="w-full h-full object-cover" />
-        )}
-        {!capturing && !preview && (
-          <div className="flex flex-col items-center gap-3 text-gray-400">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-              <Camera className="w-8 h-8" />
-            </div>
-            <p className="text-sm">Camera or upload</p>
+          {/* Snap button overlaid on video */}
+          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={snap}
+              className="flex items-center gap-1.5 px-5 py-2 rounded-full bg-white text-gray-900 font-semibold text-sm shadow-lg hover:bg-gray-100 active:scale-95 transition-all"
+            >
+              <span className="w-2 h-2 rounded-full bg-crimson-600" />
+              Capture
+            </button>
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-        )}
-        {preview && (
+        </div>
+      )}
+
+      {/* ── Preview ── */}
+      {preview && !capturing && (
+        <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden">
+          <img src={preview} alt="Captured" className="w-full h-full object-cover" />
           <button
             onClick={retake}
-            className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50 transition-colors"
+            className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors"
           >
-            <X className="w-4 h-4 text-gray-500" />
+            <X className="w-3.5 h-3.5 text-white" />
           </button>
-        )}
-      </div>
+          <div className="absolute bottom-2 left-2 bg-black/40 text-white text-[10px] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm">
+            ✓ Photo ready
+          </div>
+        </div>
+      )}
 
-      {/* Controls */}
-      <div className="flex gap-2 flex-wrap">
-        {!capturing && !preview && (
-          <button type="button" onClick={startCamera} className="btn-secondary text-xs px-4 py-2">
-            <Camera className="w-3.5 h-3.5" /> Start Camera
+      {/* ── Action buttons (idle state — no ugly gray box) ── */}
+      {!capturing && !preview && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={startCamera}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-medium text-sm transition-all"
+          >
+            <Camera className="w-4 h-4 text-gray-500" />
+            Take Photo
           </button>
-        )}
-        {capturing && (
-          <>
-            <button type="button" onClick={snap} className="btn-primary text-xs px-4 py-2">
-              <span className="w-2 h-2 bg-white rounded-full" /> Capture
-            </button>
-            <button type="button" onClick={stopCamera} className="btn-secondary text-xs px-4 py-2">
-              Cancel
-            </button>
-          </>
-        )}
-        {preview && (
-          <button type="button" onClick={retake} className="btn-secondary text-xs px-4 py-2">
-            <RefreshCw className="w-3.5 h-3.5" /> Retake
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-medium text-sm transition-all"
+          >
+            <Upload className="w-4 h-4 text-gray-500" />
+            Upload
           </button>
-        )}
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="btn-secondary text-xs px-4 py-2"
-        >
-          <Upload className="w-3.5 h-3.5" /> Upload
-        </button>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-      </div>
+        </div>
+      )}
+
+      {/* ── Retake button after capture ── */}
+      {preview && !capturing && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={retake}
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 font-medium text-sm transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retake
+          </button>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 font-medium text-sm transition-colors"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Upload instead
+          </button>
+        </div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
     </div>
   );
 }
