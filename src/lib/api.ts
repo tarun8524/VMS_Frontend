@@ -41,7 +41,7 @@ export const authApi = {
     email: string;
     employee_id: string;
     department?: string;
-    phone?: string;        // full E.164 e.g. +919876543210
+    phone?: string;
     password: string;
     photo?: Blob | null;
   }) => {
@@ -80,7 +80,21 @@ export const visitorApi = {
   list:       ()              => api.get('/visitors/'),
   get:        (uid: string)   => api.get(`/visitors/${uid}`),
   delete:     (uid: string)   => api.delete(`/visitors/${uid}`),
-  recognize:  (fd: FormData)  => api.post('/visitors/recognize', fd),
+
+  /**
+   * Global face search — used only in the visitor check-in flow (page.tsx)
+   * where we don't know which employee they belong to yet.
+   */
+  recognize: (fd: FormData) => api.post('/visitors/recognize', fd),
+
+  /**
+   * Employee-scoped face search — used in the dashboard Search page.
+   * Only returns visitors who have previously visited THIS employee.
+   * Returns at most ONE best match.
+   */
+  recognizeForEmployee: (fd: FormData) =>
+    api.post('/visitors/recognize-for-employee', fd),
+
   myVisitors: ()              => api.get('/visitors/my-visitors'),
 
   verifyIdentity: (visitor_uid: string, phone: string, email: string) => {

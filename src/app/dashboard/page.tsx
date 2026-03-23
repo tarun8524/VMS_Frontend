@@ -10,29 +10,87 @@ import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { DashboardStats, Visit, TimeRange } from '@/types';
 
-interface ChartPoint {
-  label: string;
-  total: number;
-  pending: number;
-  approved: number;
-  rejected: number;
+// ── IST helpers ────────────────────────────────────────────────────────────────
+// The backend now stores NAIVE IST datetimes in MongoDB (stripped of tzinfo).
+// Motor serialises these as ISO strings WITHOUT a timezone suffix, e.g.:
+//   "2024-03-15T15:40:00"   ← already IST wall-clock, no conversion needed
+//
+// JavaScript's Date constructor treats a no-suffix ISO string as LOCAL time
+// when running in a browser, which may not be IST.  To be safe we parse the
+// raw numeric fields directly so we never rely on JS timezone.
+
+function parseISTString(iso: string): { y:number; mo:number; d:number; h:number; m:number; s:number } {
+  // Handles both "2024-03-15T15:40:00" and "2024-03-15T15:40:00.000000"
+  // Strips any trailing Z / +offset just in case (shouldn't appear from new data)
+  const clean = iso.replace(/[Z+].*$/, '').replace(/\.\d+$/, '');
+  const [datePart, timePart = '00:00:00'] = clean.split('T');
+  const [y, mo, d]  = datePart.split('-').map(Number);
+  const [h, m, s]   = timePart.split(':').map(Number);
+  return { y, mo, d, h, m, s };
+}
+
+/** Return a plain object with IST hour/day from a stored ISO string. */
+function istFromISO(iso: string) {
+  return parseISTString(iso);
+}
+
+/** Current IST wall-clock as { h, dayOfWeek, fullMs } */
+function nowIST() {
+  // Use the Intl API to get true IST regardless of browser timezone
+  const now     = new Date();
+  const istParts = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    weekday: 'short',
+  }).formatToParts(now);
+
+  const get = (type: string) => Number(istParts.find(p => p.type === type)?.value ?? '0');
+  return {
+    h:          get('hour'),
+    minute:     get('minute'),
+    day:        get('day'),
+    month:      get('month'),
+    year:       get('year'),
+    weekday:    istParts.find(p => p.type === 'weekday')?.value ?? '',
+    utcMs:      now.getTime(),
+  };
+}
+
+/** Format an hour (0-23) as "6PM", "12AM", "3AM" etc. */
+function fmtHour(h: number): string {
+  if (h === 0)  return '12AM';
+  if (h === 12) return '12PM';
+  return h < 12 ? `${h}AM` : `${h - 12}PM`;
+}
+
+/** Format a 3-hour slot range */
+function fmtSlotRange(startHour: number): string {
+  const endHour = (startHour + 3) % 24;
+  return `${fmtHour(startHour)}–${fmtHour(endHour)}`;
 }
 
 function getGreeting() {
-  const h = new Date().getHours();
+  const { h } = nowIST();
   if (h < 12) return 'morning';
   if (h < 17) return 'afternoon';
   return 'evening';
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const { d, mo } = istFromISO(iso);  // ✅ use 'mo' directly
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d} ${months[mo - 1]}`;
 }
 
-function fmtHour(h: number): string {
-  const period = h < 12 ? 'am' : 'pm';
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}${period}`;
+interface ChartPoint {
+  label:        string;
+  tooltipLabel: string;
+  total:    number;
+  pending:  number;
+  approved: number;
+  rejected: number;
 }
 
 function tally(bucket: ChartPoint, status: string) {
@@ -42,57 +100,82 @@ function tally(bucket: ChartPoint, status: string) {
   if (status === 'rejected') bucket.rejected++;
 }
 
+// ── IST-aware chart data builder ───────────────────────────────────────────────
 function buildChartData(visits: Visit[], range: TimeRange): ChartPoint[] {
-  const now = Date.now();
+  const cur = nowIST();
   const buckets: ChartPoint[] = [];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   if (range === '24h') {
+    // 8 slots × 3 h = 24 h; anchor to the current 3-h slot in IST
+    const currentSlotHour = Math.floor(cur.h / 3) * 3;
     for (let i = 7; i >= 0; i--) {
-      const slotStart = new Date(now - i * 3 * 3600000);
-      buckets.push({ label: fmtHour(slotStart.getHours()), total: 0, pending: 0, approved: 0, rejected: 0 });
+      const slotHour = ((currentSlotHour - i * 3) % 24 + 24) % 24;
+      buckets.push({ label: fmtSlotRange(slotHour), tooltipLabel: fmtSlotRange(slotHour),
+                     total: 0, pending: 0, approved: 0, rejected: 0 });
     }
     visits.forEach(v => {
-      const msAgo = now - new Date(v.created_at).getTime();
-      if (msAgo < 86400000) {
-        const slotIdx = 7 - Math.floor(msAgo / (3 * 3600000));
-        if (buckets[slotIdx]) tally(buckets[slotIdx], v.status);
-      }
+      const ist = istFromISO(v.created_at);
+      // Compute milliseconds ago using UTC timestamps for accurate window check
+      const visitUtcMs = new Date(v.created_at.endsWith('Z') ? v.created_at : v.created_at + '+05:30').getTime();
+      const msAgo = cur.utcMs - visitUtcMs;
+      if (msAgo < 0 || msAgo >= 86400000) return;
+      const visitSlotHour = Math.floor(ist.h / 3) * 3;
+      const idx = buckets.findIndex(b => b.label === fmtSlotRange(visitSlotHour));
+      if (idx !== -1) tally(buckets[idx], v.status);
     });
+
   } else if (range === '7d') {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(now - i * 86400000);
-      buckets.push({ label: days[d.getDay()], total: 0, pending: 0, approved: 0, rejected: 0 });
+      const d = new Date(cur.utcMs - i * 86400000);
+      const parts = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata', weekday: 'short',
+      }).formatToParts(d);
+      const wd = parts.find(p => p.type === 'weekday')?.value ?? '';
+      buckets.push({ label: wd, tooltipLabel: wd,
+                     total: 0, pending: 0, approved: 0, rejected: 0 });
     }
     visits.forEach(v => {
-      const daysAgo = Math.floor((now - new Date(v.created_at).getTime()) / 86400000);
-      if (daysAgo < 7) {
-        const idx = 6 - daysAgo;
-        if (buckets[idx]) tally(buckets[idx], v.status);
-      }
+      const visitUtcMs = new Date(v.created_at.endsWith('Z') ? v.created_at : v.created_at + '+05:30').getTime();
+      const daysAgo = Math.floor((cur.utcMs - visitUtcMs) / 86400000);
+      if (daysAgo < 0 || daysAgo >= 7) return;
+      if (buckets[6 - daysAgo]) tally(buckets[6 - daysAgo], v.status);
     });
+
   } else if (range === '30d') {
     for (let w = 3; w >= 0; w--) {
-      buckets.push({ label: w === 0 ? 'This wk' : `${w}w ago`, total: 0, pending: 0, approved: 0, rejected: 0 });
+      buckets.push({ label: w === 0 ? 'This wk' : `${w}w ago`,
+                     tooltipLabel: w === 0 ? 'This week' : `${w} week${w > 1 ? 's' : ''} ago`,
+                     total: 0, pending: 0, approved: 0, rejected: 0 });
     }
     visits.forEach(v => {
-      const daysAgo = Math.floor((now - new Date(v.created_at).getTime()) / 86400000);
+      const visitUtcMs = new Date(v.created_at.endsWith('Z') ? v.created_at : v.created_at + '+05:30').getTime();
+      const daysAgo = Math.floor((cur.utcMs - visitUtcMs) / 86400000);
       const idx = 3 - Math.min(3, Math.floor(daysAgo / 7));
-      if (buckets[idx]) tally(buckets[idx], v.status);
+      if (daysAgo >= 0 && daysAgo < 28 && buckets[idx]) tally(buckets[idx], v.status);
     });
+
   } else {
-    // 'all' — group by month, last 6 months
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // 'all' — last 6 calendar months
     for (let m = 5; m >= 0; m--) {
-      const d = new Date(); d.setMonth(d.getMonth() - m);
-      buckets.push({ label: months[d.getMonth()], total: 0, pending: 0, approved: 0, rejected: 0 });
+      const d = new Date(cur.utcMs);
+      d.setMonth(d.getMonth() - m);
+      const mo = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata', month: 'short',
+      }).format(d);
+      buckets.push({ label: mo, tooltipLabel: mo,
+                     total: 0, pending: 0, approved: 0, rejected: 0 });
     }
     visits.forEach(v => {
-      const vd = new Date(v.created_at);
-      const monthsAgo = (new Date().getFullYear() - vd.getFullYear()) * 12 + new Date().getMonth() - vd.getMonth();
-      if (monthsAgo < 6 && buckets[5 - monthsAgo]) tally(buckets[5 - monthsAgo], v.status);
+      const ist      = istFromISO(v.created_at);
+      const monthsAgo = (cur.year - ist.y) * 12 + (cur.month - ist.mo);
+      if (monthsAgo >= 0 && monthsAgo < 6 && buckets[5 - monthsAgo]) {
+        tally(buckets[5 - monthsAgo], v.status);
+      }
     });
   }
+
   return buckets;
 }
 
@@ -123,11 +206,17 @@ function BarChart({ data, range }: { data: ChartPoint[]; range: TimeRange }) {
         ))}
       </div>
 
+      {/* Tooltip */}
       {hovered !== null && (
         <div className="absolute z-10 pointer-events-none"
-          style={{ bottom: '100%', left: `calc(${(hovered / data.length) * 100 + (50 / data.length)}%)`, transform: 'translateX(-50%)', marginBottom: 6 }}>
+          style={{
+            bottom: '100%',
+            left: `calc(${(hovered / data.length) * 100 + (50 / data.length)}%)`,
+            transform: 'translateX(-50%)',
+            marginBottom: 6,
+          }}>
           <div className="bg-gray-900 text-white text-xs rounded-lg px-2.5 py-1.5 shadow-lg whitespace-nowrap">
-            <p className="font-semibold">{data[hovered].label}{is24h ? ' (+3h)' : ''}</p>
+            <p className="font-semibold">{data[hovered].tooltipLabel}</p>
             <p className="text-gray-300">{data[hovered].total} total</p>
             {data[hovered].approved > 0 && <p className="text-emerald-400">✓ {data[hovered].approved} approved</p>}
             {data[hovered].pending > 0  && <p className="text-amber-400">⏳ {data[hovered].pending} pending</p>}
@@ -136,10 +225,15 @@ function BarChart({ data, range }: { data: ChartPoint[]; range: TimeRange }) {
         </div>
       )}
 
+      {/* X-axis labels */}
       <div className="flex items-start gap-1.5 mt-2">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center overflow-hidden">
-            <span className={`block text-center font-mono leading-none transition-colors ${hovered === i ? 'text-gray-700' : 'text-gray-400'} ${is24h ? 'text-[9px]' : 'text-[10px]'}`}>
+            <span
+              className={`block text-center font-mono leading-tight transition-colors ${
+                hovered === i ? 'text-gray-700' : 'text-gray-400'
+              } ${is24h ? 'text-[8px]' : 'text-[10px]'}`}
+            >
               {d.label}
             </span>
           </div>
@@ -218,10 +312,10 @@ function Sparkline({ data, color = '#c0283c' }: { data: number[]; color?: string
 // ── Time Range Selector ────────────────────────────────────────────────────────
 function TimeRangeSelector({ value, onChange }: { value: TimeRange; onChange: (v: TimeRange) => void }) {
   const opts: { label: string; value: TimeRange }[] = [
-    { label: '24h',  value: '24h' },
-    { label: '7d',   value: '7d'  },
-    { label: '30d',  value: '30d' },
-    { label: 'All',  value: 'all' },
+    { label: '24h', value: '24h' },
+    { label: '7d',  value: '7d'  },
+    { label: '30d', value: '30d' },
+    { label: 'All', value: 'all' },
   ];
   return (
     <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
@@ -246,7 +340,6 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
 
-  // Fetch visits for chart (all time, client-side filter)
   useEffect(() => {
     if (authLoading || !employee) return;
     visitApi.myVisits(undefined, false, undefined)
@@ -255,7 +348,6 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, [authLoading, employee]);
 
-  // Fetch stats whenever time range changes
   const fetchStats = useCallback(async (range: TimeRange) => {
     setStatsLoading(true);
     try {
@@ -270,25 +362,23 @@ export default function DashboardPage() {
     fetchStats(timeRange);
   }, [authLoading, employee, timeRange, fetchStats]);
 
-  const handleRangeChange = (range: TimeRange) => {
-    setTimeRange(range);
-  };
-
   const recentVisits = useMemo(() => visits.slice(0, 5), [visits]);
   const chartData    = useMemo(() => buildChartData(visits, timeRange), [visits, timeRange]);
 
   // Filter visits for current range for donut
   const rangeVisits = useMemo(() => {
-    const now = Date.now();
+    const cur = nowIST();
     const MS: Record<TimeRange, number | null> = {
-      '24h': 86400000,
-      '7d':  604800000,
-      '30d': 2592000000,
-      'all': null,
+      '24h': 86400000, '7d': 604800000, '30d': 2592000000, 'all': null,
     };
     const ms = MS[timeRange];
     if (!ms) return visits;
-    return visits.filter(v => now - new Date(v.created_at).getTime() <= ms);
+    return visits.filter(v => {
+      const visitUtcMs = new Date(
+        v.created_at.endsWith('Z') ? v.created_at : v.created_at + '+05:30'
+      ).getTime();
+      return cur.utcMs - visitUtcMs <= ms;
+    });
   }, [visits, timeRange]);
 
   const donutStats = useMemo(() => ({
@@ -298,12 +388,16 @@ export default function DashboardPage() {
     rejected: rangeVisits.filter(v => v.status === 'rejected').length,
   }), [rangeVisits]);
 
+  // Sparkline: visits per day for last 7 days
   const sparklineData = useMemo(() => {
     const days = Array(7).fill(0);
-    const now = Date.now();
+    const cur  = nowIST();
     visits.forEach(v => {
-      const d = Math.floor((now - new Date(v.created_at).getTime()) / 86400000);
-      if (d < 7) days[6 - d]++;
+      const visitUtcMs = new Date(
+        v.created_at.endsWith('Z') ? v.created_at : v.created_at + '+05:30'
+      ).getTime();
+      const d = Math.floor((cur.utcMs - visitUtcMs) / 86400000);
+      if (d >= 0 && d < 7) days[6 - d]++;
     });
     return days;
   }, [visits]);
@@ -327,7 +421,6 @@ export default function DashboardPage() {
     amber:   'bg-amber-50 text-amber-600',
     emerald: 'bg-emerald-50 text-emerald-600',
     red:     'bg-red-50 text-red-600',
-    crimson: 'bg-crimson-50 text-crimson-600',
   };
 
   return (
@@ -342,10 +435,9 @@ export default function DashboardPage() {
             </h1>
             <p className="text-gray-500 mt-1 text-sm">Here's what's happening with your visits.</p>
           </div>
-          {/* Global time range selector */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 font-medium hidden sm:inline">Showing:</span>
-            <TimeRangeSelector value={timeRange} onChange={handleRangeChange} />
+            <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
           </div>
         </div>
       </div>
@@ -376,7 +468,7 @@ export default function DashboardPage() {
       <div className="flex items-center gap-2 mb-4">
         <div className="flex-1 h-px bg-gray-100" />
         <span className="text-[11px] text-gray-400 font-medium px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
-          {rangeLabel[timeRange]} · {donutStats.total} visits
+          {rangeLabel[timeRange]} · {donutStats.total} visits · IST
         </span>
         <div className="flex-1 h-px bg-gray-100" />
       </div>
@@ -434,7 +526,7 @@ export default function DashboardPage() {
                   <p className="text-[10px] text-gray-400">Rejected</p>
                 </div>
               </div>
-              <p className="text-[10px] text-gray-400 text-center mt-2">{rangeLabel[timeRange]}</p>
+              <p className="text-[10px] text-gray-400 text-center mt-2">{rangeLabel[timeRange]} · IST</p>
             </>
           )}
         </div>
