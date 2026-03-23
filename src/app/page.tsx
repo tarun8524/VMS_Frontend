@@ -707,7 +707,7 @@ export default function HomePage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-crimson-500 animate-pulse" />Face Recognition Powered
               </div>
               <h1 className="font-display text-4xl sm:text-5xl font-bold text-gray-900 leading-tight">
-                Visitor Management, <span className="text-crimson-700">Reimagined.</span>
+                Visitor Management, <span className="text-crimson-700">System.</span>
               </h1>
               <p className="text-gray-500 mt-4 text-base leading-relaxed">
                 Register visitors with face recognition, get instant employee notifications, and manage approvals — all in one professional platform.
@@ -716,26 +716,58 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="lg:w-2/5 flex items-center justify-center px-6 py-16 lg:py-0 bg-gray-50">
-          <div className="w-full max-w-sm animate-slide-up lg:-translate-x-40 lg:mt-14">
-            <div className="card shadow-card-lg">
-              <div className="flex items-center justify-center mb-5">
-                <img src="/logo.png" alt="Logo" style={{ height: '70px', width: '260px' }} />
-              </div>
-              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-5">
-                <button onClick={() => setCard('signin')} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${card === 'signin' ? 'bg-white text-crimson-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Sign In</button>
-                <button onClick={() => setCard('signup')} className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${card === 'signup' ? 'bg-white text-crimson-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Sign Up</button>
-              </div>
-              {card === 'signin' ? <SignInForm /> : <SignUpForm onDone={() => setCard('signin')} />}
-              <div className="flex items-center justify-center mt-6 pt-2">
-                <img src="/facegenie_logo.png" alt="Logo" style={{ height: '60px', width: '220px' }} />
-              </div>
+       <div className="lg:w-2/5 flex items-center justify-center px-6 py-16 lg:py-0 bg-gray-50">
+        <div className="w-full max-w-sm animate-slide-up lg:-translate-x-40 lg:mt-14">
+          <div className="card shadow-card-lg">
+            
+            <div className="flex items-center justify-center mb-5">
+              <img src="/logo.png" alt="Logo" style={{ height: '70px', width: '260px' }} />
             </div>
-            <p className="text-center mt-4 text-sm text-gray-400">
-              Visiting someone? <button onClick={() => setShowVisitor(true)} className="text-crimson-600 font-medium hover:text-crimson-700">Register here</button>
-            </p>
+
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-5">
+              <button 
+                onClick={() => setCard('signin')} 
+                className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  card === 'signin' ? 'bg-white text-crimson-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Sign In
+              </button>
+
+              <button 
+                onClick={() => setCard('signup')} 
+                className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  card === 'signup' ? 'bg-white text-crimson-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            {card === 'signin' ? <SignInForm /> : <SignUpForm onDone={() => setCard('signin')} />}
+
+            {/* ✅ Powered by + Logo */}
+            <div className="flex flex-col items-center justify-center mt-6 pt-2">
+              <span className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">
+                Powered by
+              </span>
+              <img src="/facegenie_logo.png" alt="Logo" style={{ height: '60px', width: '220px' }} />
+            </div>
+
           </div>
+
+          <p className="text-center mt-4 text-sm text-gray-400">
+            Visiting someone? 
+            <button 
+              onClick={() => setShowVisitor(true)} 
+              className="text-crimson-600 font-medium hover:text-crimson-700"
+            >
+              Register here
+            </button>
+          </p>
+
         </div>
+      </div>
       </div>
     </div>
   );

@@ -225,7 +225,9 @@ export function Sidebar() {
           </button>
         </div>
 
-        <div className="px-5 py-4 flex items-center justify-center">
+        {/* ── Powered by + Logo ── */}
+        <div className="px-5 py-4 flex flex-col items-center justify-center gap-1">
+          <span className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">Powered by</span>
           <Image src="/logo.png" alt="Logo" width={220} height={40} className="object-contain" priority />
         </div>
       </aside>
@@ -291,8 +293,11 @@ export function Sidebar() {
                 Logout
               </button>
             </div>
-            <div className="px-4 py-3 flex items-center justify-center border-t border-gray-50">
-              <Image src="/logo.png" alt="Logo" width={110} height={26} className="object-contain" priority />
+
+            {/* ── Powered by + Logo (drawer) ── */}
+            <div className="px-4 py-3 flex flex-col items-center justify-center gap-1 border-t border-gray-50">
+              <span className="text-[10px] text-gray-400 font-medium tracking-wide uppercase">Powered by</span>
+              <Image src="/logo.png" alt="Logo" width={110} height={24} className="object-contain" priority />
             </div>
           </div>
         </div>
